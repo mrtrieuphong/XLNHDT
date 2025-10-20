@@ -148,7 +148,9 @@ def create_moodle_xml(questions):
 if __name__ == "__main__":
     code = "C1K1L1"
     input_file = f'{code}_raw.xml'
-    output_file = f'XMLdata/questions-VAA-{code}.xml'
+    output_dir = 'XMLdata'
+    output_file = f'{output_dir}/questions-VAA-{code}.xml'
+    os.makedirs(output_dir, exist_ok=True)
 
     # 1. Đọc và phân tích các câu hỏi mới
     new_questions = parse_new_questions(input_file)
