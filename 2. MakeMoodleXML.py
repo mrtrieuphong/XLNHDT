@@ -1,32 +1,44 @@
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import re
+import os
 
 def parse_new_questions(file_path):
-    """
-    Phân tích tệp XML chứa câu hỏi mới và trả về một danh sách các đối tượng câu hỏi.
-    """
     try:
         tree = ET.parse(file_path)
         root = tree.getroot()
         questions_data = []
         
         for q_elem in root.findall('question'):
-            # Trích xuất thông tin từ mỗi câu hỏi
             options = []
             options_elem = q_elem.find('options')
-            for opt_elem in options_elem.findall('option'):
-                full_text = opt_elem.text
-                # Tách ký tự đầu (A, B, C, D) và nội dung
-                letter = full_text.split('.')[0]
-                text = '.'.join(full_text.split('.')[1:]).strip()
-                options.append({'letter': letter, 'text': text})
+            if options_elem is not None:
+                for opt_elem in options_elem.findall('option'):
+                    raw = (opt_elem.text or "").strip()
+
+                    # 1) Ưu tiên lấy từ thuộc tính label (XML của bạn có)
+                    label_attr = (opt_elem.get('label') or "").strip()
+                    if label_attr:
+                        letter = label_attr.upper()
+                        text = raw
+                    else:
+                        # 2) Fallback: hỗ trợ "A. ..." / "A) ..." / "A ... "
+                        m = re.match(r'\s*([A-D])[\.\)]?\s*(.*)$', raw, re.DOTALL | re.IGNORECASE)
+                        if m:
+                            letter = m.group(1).upper()
+                            text = m.group(2).strip()
+                        else:
+                            # 3) Cuối cùng: gán tuần tự A, B, C, D nếu không nhận diện được
+                            letter = chr(ord('A') + len(options))
+                            text = raw
+
+                    options.append({'letter': letter, 'text': text})
 
             question_info = {
                 'id': q_elem.get('id'),
-                'text': q_elem.find('text').text,
-                'level': q_elem.find('level').text,
-                'correct_answer_letter': q_elem.find('answer').text,
+                'text': (q_elem.find('text').text or "").strip(),
+                'level': (q_elem.find('level').text or "").strip(),
+                'correct_answer_letter': (q_elem.find('answer').text or "").strip().upper(),
                 'options': options
             }
             questions_data.append(question_info)
@@ -146,27 +158,54 @@ def create_moodle_xml(questions):
 
 # --- Chương trình chính ---
 if __name__ == "__main__":
-    code = "C1K1L1"
-    input_file = f'{code}_raw.xml'
-    output_dir = 'XMLdata'
-    output_file = f'{output_dir}/questions-VAA-{code}.xml'
+    import os, re
+    from glob import glob
+
+    input_dir = "hanh_vi_to_chuc"
+    output_dir = os.path.join("XMLdata", "hanh_vi_to_chuc")
     os.makedirs(output_dir, exist_ok=True)
 
-    # 1. Đọc và phân tích các câu hỏi mới
-    new_questions = parse_new_questions(input_file)
+    input_files = sorted(glob(os.path.join(input_dir, "*_raw.xml")))
+    if not input_files:
+        print(f"⚠️ Không tìm thấy file *_raw.xml trong thư mục '{input_dir}'.")
+        raise SystemExit(0)
 
-    if new_questions:
-        # 2. Tạo nội dung XML mới theo cấu trúc Moodle
+    total_questions = 0
+
+    for input_file in input_files:
+        base = os.path.basename(input_file)
+        code = re.sub(r'_raw\.xml$', '', base)  # ví dụ: C1K1L1_raw.xml -> C1K1L1
+        output_file = os.path.join(output_dir, f"questions-VAA-{code}.xml")
+
+        # 1) Đọc và phân tích các câu hỏi mới
+        new_questions = parse_new_questions(input_file)
+        if not new_questions:
+            print(f"⚠️ Bỏ qua '{base}' (không đọc được câu hỏi).")
+            continue
+
+        # 2) Tạo nội dung XML theo cấu trúc Moodle
         moodle_xml_content = create_moodle_xml(new_questions)
+        if not moodle_xml_content:
+            print(f"⚠️ Bỏ qua '{base}' (không tạo được Moodle XML).")
+            continue
 
-        # 3. Ghi nội dung ra tệp mới
+        # 3) Ghi ra tệp đích
         try:
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(moodle_xml_content)
-            print(f"Hoàn tất! Đã tạo tệp '{output_file}' với {len(new_questions)} câu hỏi được cập nhật.")
-            start_id = int(new_questions[0]['id'].split('Q')[-1])
-            end_id = int(new_questions[-1]['id'].split('Q')[-1])
-            count = end_id - start_id + 1  # +1 nếu muốn tính cả 2 đầu
-            print(f"Từ câu: {new_questions[0]['id']} đến câu: {new_questions[-1]['id']} có {count} câu hỏi.")
+            print(f"✅ {base} → {output_file} ({len(new_questions)} câu hỏi)")
+
+            # In dải QID để đối chiếu nhanh
+            try:
+                start_id = int(new_questions[0]['id'].split('Q')[-1])
+                end_id = int(new_questions[-1]['id'].split('Q')[-1])
+                count_range = end_id - start_id + 1
+                print(f"   Dải ID: {new_questions[0]['id']} → {new_questions[-1]['id']} (~{count_range} vị trí, {len(new_questions)} câu hợp lệ)")
+            except Exception:
+                pass
+
+            total_questions += len(new_questions)
         except IOError:
-            print(f"Lỗi: Không thể ghi vào tệp '{output_file}'")
+            print(f"❌ Lỗi: Không thể ghi vào tệp '{output_file}'")
+
+    print(f"\nHoàn tất. Tổng số câu hỏi đã xuất: {total_questions}")

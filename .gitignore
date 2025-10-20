@@ -1,0 +1,11 @@
+# Ignore everything
+/*
+
+# Keep the .gitignore itself
+!.gitignore
+
+# Allow only these four scripts at repo root
+!/1. MakeRawXML.py
+!/2. MakeMoodleXML.py
+!/3. CombinePart2Chapter.py
+!/4. CountChapter.py
