@@ -1,23 +1,26 @@
 import os
 import xml.etree.ElementTree as ET
+from glob import glob
 
-# Mẫu tên file (sẽ format với số Chương)
-file_templates = [
-    "XMLdata/hanh_vi_to_chuc/questions-VAA-C{}K1L1.xml",
-    "XMLdata/hanh_vi_to_chuc/questions-VAA-C{}K2L2.xml",
-    "XMLdata/hanh_vi_to_chuc/questions-VAA-C{}K3L3.xml",
-    # thêm hoặc bỏ comment các template khác nếu cần
+# Patterns (dùng glob để khớp cả trường hợp có hoặc không có segment "S<number>" giữa K và L)
+file_patterns = [
+    "XMLdata/hanh_vi_to_chuc/questions-VAA-C{}K1*L1.xml",
+    "XMLdata/hanh_vi_to_chuc/questions-VAA-C{}K2*L2.xml",
+    "XMLdata/hanh_vi_to_chuc/questions-VAA-C{}K3*L3.xml",
+    # thêm hoặc bỏ comment các pattern khác nếu cần
 ]
 
-for C in range(1, 10):  # Chạy từ Chương 1 tới Chương 9
-    Cstr = str(C)
-    files = [t.format(Cstr) for t in file_templates]
+def merge_chapter_files(chapter_number: int):
+    Cstr = str(chapter_number)
+    files = []
+    for p in file_patterns:
+        files.extend(sorted(glob(p.format(Cstr))))
 
-    # Chỉ lấy những file tồn tại
-    existing_files = [f for f in files if os.path.exists(f)]
+    # Lọc những file thật sự tồn tại và loại trùng, giữ thứ tự
+    existing_files = sorted(dict.fromkeys(f for f in files if os.path.exists(f)))
     if not existing_files:
-        print(f"⚠️ Chương {C}: không tìm thấy file nguồn, bỏ qua.")
-        continue
+        print(f"⚠️ Chương {chapter_number}: không tìm thấy file nguồn, bỏ qua.")
+        return
 
     try:
         # Parse file đầu tiên làm gốc
@@ -32,11 +35,17 @@ for C in range(1, 10):  # Chạy từ Chương 1 tới Chương 9
                 root.append(question)
 
         # Ghi kết quả ra file mới
-        output_file = f"XMLdata/questions-VAA-C{C}.xml"
+        output_file = f"XMLdata/questions-VAA-C{chapter_number}.xml"
         tree.write(output_file, encoding='utf-8', xml_declaration=True)
-        print(f"Chương {C}: đã hợp nhất xong, file kết quả: {output_file}")
+        print(f"Chương {chapter_number}: đã hợp nhất xong, file kết quả: {output_file}")
 
     except ET.ParseError as e:
-        print(f"❌ Chương {C}: lỗi khi parse XML: {e}")
+        print(f"❌ Chương {chapter_number}: lỗi khi parse XML: {e}")
     except Exception as e:
-        print(f"❌ Chương {C}: lỗi không mong muốn: {e}")
+        print(f"❌ Chương {chapter_number}: lỗi không mong muốn: {e}")
+
+
+if __name__ == '__main__':
+    # Chạy từ Chương 1 tới Chương 9 (nếu cần tới 10 đổi range thành (1, 11))
+    for C in range(1, 10):
+        merge_chapter_files(C)

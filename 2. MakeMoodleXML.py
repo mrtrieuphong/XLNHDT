@@ -60,12 +60,13 @@ def create_moodle_xml(questions):
 
     # Tự động xác định mã danh mục từ ID câu hỏi đầu tiên (ví dụ: C1K3L4Q24)
     first_id = questions[0]['id']
-    match = re.match(r"(C\d+)(K\d+)(L\d+)", first_id)
+    # Allow optional S\d+ (e.g. C1K3S1L3) between K and L and capture the S number
+    match = re.match(r"(C\d+)(K\d+)(?:S(\d+))?(L\d+)", first_id)
     if not match:
         print("Lỗi: Không thể xác định mã danh mục từ ID câu hỏi.")
         return ""
-        
-    cat_c, cat_k, cat_l = match.groups()
+    # match.groups() => (cat_c, cat_k, s_num_or_None, cat_l)
+    cat_c, cat_k, s_num, cat_l = match.groups()
     chapter_num = cat_c[1:]
     k_num = cat_k[1:]
     level_num = cat_l[1:]
@@ -90,7 +91,13 @@ def create_moodle_xml(questions):
     
     xml_output_lines.append(category_template.format(path=f"$module$/top/{cat_c}", name=f"Chương {chapter_num}", id=cat_c))
     xml_output_lines.append(category_template.format(path=f"$module$/top/{cat_c}/{cat_k}", name=f"Chuẩn đầu ra K{k_num}", id=f"{cat_c}{cat_k}"))
-    xml_output_lines.append(category_template.format(path=f"$module$/top/{cat_c}/{cat_k}/{cat_l}", name=f"Cấp độ {level_num}", id=f"{cat_c}{cat_k}{cat_l}"))
+    # If there's an S (sub-chuẩn) include it as an extra category level
+    if s_num:
+        s_id = f"{cat_c}{cat_k}S{s_num}"
+        xml_output_lines.append(category_template.format(path=f"$module$/top/{cat_c}/{cat_k}/S{s_num}", name=f"Sub-K S{s_num}", id=s_id))
+        xml_output_lines.append(category_template.format(path=f"$module$/top/{cat_c}/{cat_k}/S{s_num}/{cat_l}", name=f"Cấp độ {level_num}", id=f"{cat_c}{cat_k}S{s_num}{cat_l}"))
+    else:
+        xml_output_lines.append(category_template.format(path=f"$module$/top/{cat_c}/{cat_k}/{cat_l}", name=f"Cấp độ {level_num}", id=f"{cat_c}{cat_k}{cat_l}"))
 
     # --- Thêm các câu hỏi trắc nghiệm ---
     question_template = """

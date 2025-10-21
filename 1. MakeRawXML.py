@@ -62,10 +62,10 @@ A. Văn hóa vụ lợi
 B. Văn hóa mạng lưới
 C. Văn hóa phân tán
 D. Văn hóa cộng đồng
-Đáp án: D 
+Đáp án: D
 """
 
-code = "C9K3L3"
+code = "C9K3S3L3"
 # Chương ,Chuẩn đầu ra, Cấp độ 
 
 # Lấy cấp độ từ chữ L trong code (ví dụ C1K4L4 -> level = "4")
